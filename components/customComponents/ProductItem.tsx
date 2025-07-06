@@ -11,12 +11,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import UploadImage from "./UploadImage";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 
 type Props = {
   index: number;
   register: any;
   watch: any;
+  getValues: () => any;
   setValue: any;
   remove: (index: number) => void;
   append: (item: any) => void;
@@ -29,6 +30,7 @@ export default function ProductItem({
   index,
   register,
   watch,
+  getValues,
   setValue,
   remove,
   append,
@@ -36,7 +38,23 @@ export default function ProductItem({
   statusOptions,
   lastIndex,
 }: Props) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [summary, setSummary] = useState<{
+    productName: string;
+    quantity: number;
+    unit: string;
+    status: string;
+    image: string[];
+  }>({
+    productName: "",
+    quantity: 0,
+    unit: "",
+    status: "",
+    image: [],
+  });
+
   const image = watch(`items.${index}.image`);
+
   const productNameRef = useRef<HTMLInputElement>(null);
   const unitRef = useRef<HTMLInputElement>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
@@ -107,7 +125,53 @@ export default function ProductItem({
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  return (
+  // Tách register để gộp ref an toàn
+  const { ref: productNameFormRef, ...productNameRest } = register(
+    `items.${index}.productName`
+  );
+  const { ref: unitFormRef, ...unitRest } = register(`items.${index}.unit`);
+  const { ref: quantityFormRef, ...quantityRest } = register(
+    `items.${index}.quantity`,
+    {
+      valueAsNumber: true,
+    }
+  );
+
+  return collapsed ? (
+    <div className="flex items-center justify-between w-full border p-3 rounded-lg">
+      <div className="flex items-center gap-3 overflow-x-auto">
+        <span className="font-medium">{summary.productName}</span>
+        <span className="text-sm text-muted-foreground">
+          {summary.quantity} {summary.unit}
+        </span>
+        <span className="text-sm text-muted-foreground">{summary.status}</span>
+        {summary.image?.length > 0 && (
+          <img
+            src={summary.image[0]}
+            alt="Hình"
+            className="w-10 h-10 object-cover rounded-md"
+          />
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" onClick={() => setCollapsed(false)}>
+          Sửa
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-red-500 hover:bg-red-100"
+          onClick={() => {
+            if (window.confirm("Bạn có chắc muốn xoá sản phẩm này?")) {
+              handleRemove();
+            }
+          }}
+        >
+          ✕
+        </Button>
+      </div>
+    </div>
+  ) : (
     <div className="relative flex flex-col items-end gap-2 border p-3 rounded-lg overflow-x-auto">
       <Button
         type="button"
@@ -127,10 +191,13 @@ export default function ProductItem({
         <div className="flex flex-col w-[320px]">
           <Label className="text-sm">Tên sản phẩm</Label>
           <Input
-            {...register(`items.${index}.productName`)}
+            {...productNameRest}
             data-row={index}
             data-col="productName"
-            ref={productNameRef}
+            ref={(el) => {
+              productNameFormRef(el);
+              productNameRef.current = el;
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -145,10 +212,13 @@ export default function ProductItem({
         <div className="flex flex-col w-[150px]">
           <Label className="text-sm">Đơn vị</Label>
           <Input
-            {...register(`items.${index}.unit`)}
+            {...unitRest}
             data-row={index}
             data-col="unit"
-            ref={unitRef}
+            ref={(el) => {
+              unitFormRef(el);
+              unitRef.current = el;
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -163,13 +233,14 @@ export default function ProductItem({
         <div className="flex flex-col w-[150px]">
           <Label className="text-sm">Số lượng</Label>
           <Input
+            {...quantityRest}
             type="number"
-            {...register(`items.${index}.quantity`, {
-              valueAsNumber: true,
-            })}
             data-row={index}
             data-col="quantity"
-            ref={quantityRef}
+            ref={(el) => {
+              quantityFormRef(el);
+              quantityRef.current = el;
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -216,6 +287,30 @@ export default function ProductItem({
           value={image || []}
           onChange={(val: string[]) => setValue(`items.${index}.image`, val)}
         />
+      </div>
+
+      <div className="w-full flex justify-end">
+        <Button
+          type="button"
+          variant="default"
+          onClick={() => {
+            const values = getValues();
+            const item = values.items?.[index];
+
+            const newSummary = {
+              productName: item?.productName || "",
+              quantity: item?.quantity || 0,
+              unit: item?.unit || "",
+              status: item?.status || "",
+              image: item?.image || [],
+            };
+
+            setSummary(newSummary);
+            setCollapsed(true);
+          }}
+        >
+          Hoàn tất
+        </Button>
       </div>
     </div>
   );

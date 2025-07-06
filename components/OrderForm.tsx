@@ -45,7 +45,7 @@ const defaultValue = {
   unit: "",
   quantity: 1,
   status: "Chưa xử lý",
-  image: null,
+  image: [],
 };
 
 export default function OrderForm({ companies }: Props) {
@@ -116,6 +116,7 @@ export default function OrderForm({ companies }: Props) {
             lastIndex={fields.length - 1}
             register={register}
             watch={watch}
+            getValues={getValues}
             setValue={setValue}
             remove={remove}
             append={append}
