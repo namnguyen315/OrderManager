@@ -3,49 +3,32 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useState } from "react";
-import { Input } from "@/components/ui/input";
+
+import { useEffect } from "react";
+
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "@/components/ui/command";
-import { Check } from "lucide-react";
-import { cn } from "@/lib/utils";
-import Image from "next/image";
-import UploadImage from "./customComponents/UploadImage";
+import CompanySelector from "./customComponents/CompanySelector";
+import ProductItem from "./customComponents/ProductItem";
 
-const statusOptions = ["Đã xử lý", "Chưa xử lý", "Chờ đặt hàng"];
+const statusOptions = ["Chưa xử lý", "Đã xử lý", "Chờ đặt hàng"];
 
 const schema = z.object({
   companyId: z.string().min(1, "Chọn công ty"),
   receivedDate: z.string().min(1, "Chọn ngày tiếp nhận"),
-  items: z.array(
-    z.object({
-      productName: z.string().min(1, "Tên sản phẩm bắt buộc"),
-      unit: z.string(),
-      quantity: z.number().min(1),
-      image: z.any().optional(),
-      status: z.string(),
-    })
-  ),
+  items: z
+    .array(
+      z.object({
+        productName: z.string().min(1, "Tên sản phẩm là bắt buộc"),
+        unit: z.string().min(1, "Đơn vị là bắt buộc"),
+        quantity: z.number().min(1, "Tối thiểu là 1"),
+        image: z.any().optional(),
+        status: z.string(),
+      })
+    )
+    .min(1, "Phải có ít nhất một sản phẩm"),
 });
 
 type Company = {
@@ -57,85 +40,66 @@ type Props = {
   companies: Company[];
 };
 
-export default function OrderForm({ companies }: Props) {
-  const [companyOpen, setCompanyOpen] = useState(false);
+const defaultValue = {
+  productName: "",
+  unit: "",
+  quantity: 1,
+  status: "Chưa xử lý",
+  image: null,
+};
 
-  const { register, control, handleSubmit, setValue, watch } = useForm({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      companyId: "",
-      receivedDate: new Date().toISOString().slice(0, 10),
-      items: [
-        {
-          productName: "",
-          unit: "",
-          quantity: 1,
-          status: "Chưa xử lý",
-          image: null,
-        },
-      ],
-    },
+export default function OrderForm({ companies }: Props) {
+  const { register, control, handleSubmit, setValue, watch, getValues } =
+    useForm({
+      resolver: zodResolver(schema),
+      defaultValues: {
+        companyId: "",
+        receivedDate: new Date().toISOString().slice(0, 10),
+        items: [defaultValue], // ✅ Có sẵn một trường nhập lúc đầu
+      },
+    });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "items",
   });
 
-  const { fields, append, remove } = useFieldArray({ control, name: "items" });
-
   const selectedCompanyId = watch("companyId");
-  const selectedCompany = companies.find((c) => c.id === selectedCompanyId);
+
+  // ✅ Tạo dòng mới và focus vào productName
+  const handleAddNewItem = () => {
+    const newIndex = fields.length;
+    append(defaultValue);
+
+    requestAnimationFrame(() => {
+      const input = document.querySelector<HTMLInputElement>(
+        `input[name="items.${newIndex}.productName"]`
+      );
+      input?.focus();
+    });
+  };
 
   const onSubmit = (data: any) => {
-    console.log("Dữ liệu gửi đi:", data);
-    // TODO: Gửi dữ liệu về API nếu cần
+    console.log("✅ Dữ liệu hợp lệ:", data);
+    // TODO: Gửi API
+  };
+
+  const onError = (errors: any) => {
+    console.log("❌ Validation lỗi:", errors);
   };
 
   return (
     <form
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleSubmit(onSubmit, onError)}
       className="space-y-6 p-4 max-w-5xl mx-auto"
     >
-      {/* Chọn công ty + Ngày tiếp nhận */}
+      {/* Công ty + Ngày tiếp nhận */}
       <div className="flex flex-col sm:flex-row gap-4 items-end">
-        <div className="w-full">
-          <Label className="mb-1">Chọn công ty</Label>
-          <Popover open={companyOpen} onOpenChange={setCompanyOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                className="w-full justify-between"
-              >
-                {selectedCompany ? selectedCompany.name : "Chọn công ty..."}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-full p-0">
-              <Command>
-                <CommandInput placeholder="Tìm công ty..." className="h-9" />
-                <CommandEmpty>Không tìm thấy công ty</CommandEmpty>
-                <CommandGroup>
-                  {companies.map((company) => (
-                    <CommandItem
-                      key={company.id}
-                      value={company.name}
-                      onSelect={() => {
-                        setValue("companyId", company.id);
-                        setCompanyOpen(false);
-                      }}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          selectedCompanyId === company.id
-                            ? "opacity-100"
-                            : "opacity-0"
-                        )}
-                      />
-                      {company.name}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <CompanySelector
+          companies={companies}
+          selectedCompanyId={selectedCompanyId}
+          setValue={(val: string) => setValue("companyId", val)}
+        />
 
         <div className="w-full sm:w-[200px]">
           <Label className="mb-1">Ngày tiếp nhận</Label>
@@ -145,120 +109,22 @@ export default function OrderForm({ companies }: Props) {
 
       {/* Danh sách sản phẩm */}
       <div className="space-y-3">
-        {fields.map((field, index) => {
-          const image = watch(`items.${index}.image`);
+        {fields.map((field, index) => (
+          <ProductItem
+            key={field.id}
+            index={index}
+            lastIndex={fields.length - 1}
+            register={register}
+            watch={watch}
+            setValue={setValue}
+            remove={remove}
+            append={append}
+            field={field}
+            statusOptions={statusOptions}
+          />
+        ))}
 
-          return (
-            <div
-              key={field.id}
-              className="flex items-end gap-2 border p-3 rounded-lg overflow-x-auto"
-            >
-              <div className="flex flex-col w-[180px]">
-                <Label className="text-sm">Tên sản phẩm</Label>
-                <Input {...register(`items.${index}.productName`)} />
-              </div>
-
-              <div className="flex flex-col w-[100px]">
-                <Label className="text-sm">Đơn vị</Label>
-                <Input {...register(`items.${index}.unit`)} />
-              </div>
-
-              <div className="flex flex-col w-[90px]">
-                <Label className="text-sm">Số lượng</Label>
-                <Input
-                  type="number"
-                  {...register(`items.${index}.quantity`, {
-                    valueAsNumber: true,
-                  })}
-                />
-              </div>
-
-              <div className="flex flex-col w-[150px]">
-                <Label className="text-sm">Trạng thái</Label>
-                <Select
-                  onValueChange={(val) =>
-                    setValue(`items.${index}.status`, val)
-                  }
-                  defaultValue={field.status}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusOptions.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col w-[180px]">
-                <Label className="text-sm">Hình ảnh</Label>
-                {/* <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) =>
-                    setValue(
-                      `items.${index}.image`,
-                      e.target.files?.[0] || null
-                    )
-                  }
-                  onPaste={(e) => {
-                    const items = e.clipboardData?.items;
-                    if (!items) return;
-                    for (const item of items) {
-                      if (item.type.startsWith("image/")) {
-                        const file = item.getAsFile();
-                        if (file) {
-                          setValue(`items.${index}.image`, file);
-                          break;
-                        }
-                      }
-                    }
-                  }}
-                /> */}
-                <UploadImage />
-                {/* Ảnh xem trước */}
-                {image && typeof image !== "string" && (
-                  <Image
-                    src={URL.createObjectURL(image)}
-                    alt="Preview"
-                    className="mt-1 h-16 object-contain rounded border"
-                    width={300}
-                    height={300}
-                  />
-                )}
-              </div>
-
-              <div className="pb-1">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => remove(index)}
-                >
-                  Xóa
-                </Button>
-              </div>
-            </div>
-          );
-        })}
-
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() =>
-            append({
-              productName: "",
-              unit: "",
-              quantity: 1,
-              status: "Chưa xử lý",
-              image: null,
-            })
-          }
-        >
+        <Button type="button" variant="outline" onClick={handleAddNewItem}>
           + Thêm sản phẩm
         </Button>
       </div>
